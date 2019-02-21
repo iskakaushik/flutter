@@ -28,6 +28,7 @@ const int _kDefaultSizeBytes = 100 << 20; // 100 MiB
 class ImageCache {
   final Map<Object, _PendingImage> _pendingImages = <Object, _PendingImage>{};
   final Map<Object, _CachedImage> _cache = <Object, _CachedImage>{};
+  final _ImageCacheStats _cacheStats = _ImageCacheStats();
 
   /// Maximum number of entries to store in the cache.
   ///
@@ -35,6 +36,7 @@ class ImageCache {
   /// evicted when adding a new entry.
   int get maximumSize => _maximumSize;
   int _maximumSize = _kDefaultSize;
+
   /// Changes the maximum cache size.
   ///
   /// If the new size is smaller than the current number of elements, the
@@ -44,8 +46,7 @@ class ImageCache {
   set maximumSize(int value) {
     assert(value != null);
     assert(value >= 0);
-    if (value == maximumSize)
-      return;
+    if (value == maximumSize) return;
     _maximumSize = value;
     if (maximumSize == 0) {
       clear();
@@ -64,6 +65,7 @@ class ImageCache {
   /// maximum bytes.
   int get maximumSizeBytes => _maximumSizeBytes;
   int _maximumSizeBytes = _kDefaultSizeBytes;
+
   /// Changes the maximum cache bytes.
   ///
   /// If the new size is smaller than the current size in bytes, the
@@ -73,8 +75,7 @@ class ImageCache {
   set maximumSizeBytes(int value) {
     assert(value != null);
     assert(value >= 0);
-    if (value == _maximumSizeBytes)
-      return;
+    if (value == _maximumSizeBytes) return;
     _maximumSizeBytes = value;
     if (_maximumSizeBytes == 0) {
       clear();
@@ -94,10 +95,13 @@ class ImageCache {
   ///
   /// Images which have not finished loading yet will not be removed from the
   /// cache, and when they complete they will be inserted as normal.
+  ///
+  /// This will also reset the [_ImageCacheStats] associated with this cache.
   void clear() {
     _cache.clear();
     _pendingImages.clear();
     _currentSizeBytes = 0;
+    _cacheStats.reset();
   }
 
   /// Evicts a single entry from the cache, returning true if successful.
@@ -139,13 +143,13 @@ class ImageCache {
   /// `onError` is also provided. When an exception is caught resolving an image,
   /// no completers are cached and `null` is returned instead of a new
   /// completer.
-  ImageStreamCompleter putIfAbsent(Object key, ImageStreamCompleter loader(), { ImageErrorListener onError }) {
+  ImageStreamCompleter putIfAbsent(Object key, ImageStreamCompleter loader(),
+      {ImageErrorListener onError}) {
     assert(key != null);
     assert(loader != null);
     ImageStreamCompleter result = _pendingImages[key]?.completer;
     // Nothing needs to be done because the image hasn't loaded yet.
-    if (result != null)
-      return result;
+    if (result != null) return result;
     // Remove the provider from the list so that we can move it to the
     // recently used position below.
     final _CachedImage image = _cache.remove(key);
@@ -165,7 +169,8 @@ class ImageCache {
     }
     void listener(ImageInfo info, bool syncCall) {
       // Images that fail to load don't contribute to cache size.
-      final int imageSize = info?.image == null ? 0 : info.image.height * info.image.width * 4;
+      final int imageSize =
+          info?.image == null ? 0 : info.image.height * info.image.width * 4;
       final _CachedImage image = _CachedImage(result, imageSize);
       // If the image is bigger than the maximum cache size, and the cache size
       // is not zero, then increase the cache size to the size of the image plus
@@ -182,6 +187,7 @@ class ImageCache {
       _cache[key] = image;
       _checkCacheSize();
     }
+
     if (maximumSize > 0 && maximumSizeBytes > 0) {
       _pendingImages[key] = _PendingImage(result, listener);
       result.addListener(listener);
@@ -192,7 +198,8 @@ class ImageCache {
   // Remove images from the cache until both the length and bytes are below
   // maximum, or the cache is empty.
   void _checkCacheSize() {
-    while (_currentSizeBytes > _maximumSizeBytes || _cache.length > _maximumSize) {
+    while (
+        _currentSizeBytes > _maximumSizeBytes || _cache.length > _maximumSize) {
       final Object key = _cache.keys.first;
       final _CachedImage image = _cache[key];
       _currentSizeBytes -= image.sizeBytes;
@@ -201,6 +208,24 @@ class ImageCache {
     assert(_currentSizeBytes >= 0);
     assert(_cache.length <= maximumSize);
     assert(_currentSizeBytes <= maximumSizeBytes);
+  }
+}
+
+class _ImageCacheStats {
+  int _numHits = 0;
+  int _numMisses = 0;
+
+  void recordHit() {
+    _numHits++;
+  }
+
+  void recordMiss() {
+    _numMisses++;
+  }
+
+  void reset() {
+    _numHits = 0;
+    _numMisses = 0;
   }
 }
 
