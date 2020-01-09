@@ -18,6 +18,8 @@
 
 set -Ee
 
+./flutter/bin/flutter doctor
+
 # The nodes are named blah-blah--four-word-fuchsia-id
 device_name=${SWARMING_BOT_ID#*--}
 
