@@ -37,3 +37,4 @@ reboot() {
 trap reboot EXIT
 
 ./fuchsia_ctl -d $device_name pave  -i $1
+./fuchsia_ctl push-packages -d $device_name --repoArchive generic-x64.tar.gz -p tiles -p tiles_ctl
