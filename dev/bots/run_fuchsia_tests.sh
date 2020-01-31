@@ -41,6 +41,29 @@ trap reboot EXIT
 $script_dir/fuchsia_ctl -d $device_name pave  -i $1
 $script_dir/fuchsia_ctl push-packages -d $device_name --repoArchive generic-x64.tar.gz -p tiles -p tiles_ctl
 
+# set fuchsia ssh config
+export FUCHSIA_SSH_PKEY=$script_dir/.ssh/pkey
+cat > $script_dir/fuchsia_ssh_config << EOF
+Host *
+  CheckHostIP no
+  StrictHostKeyChecking no
+  ForwardAgent no
+  ForwardX11 no
+  GSSAPIDelegateCredentials no
+  UserKnownHostsFile /dev/null
+  User fuchsia
+  IdentitiesOnly yes
+  IdentityFile $FUCHSIA_SSH_PKEY
+  ControlPersist yes
+  ControlMaster auto
+  ControlPath /tmp/fuchsia--%r@%h:%p
+  ConnectTimeout 10
+  ServerAliveInterval 1
+  ServerAliveCountMax 10
+  LogLevel ERROR
+EOF
+export FUCHSIA_SSH_CONFIG=$script_dir/fuchsia_ssh_config
+
 # Run the driver test
 flutter_dir=$script_dir/flutter
 flutter_bin=$flutter_dir/bin/flutter
